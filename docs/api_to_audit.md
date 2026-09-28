@@ -2320,11 +2320,11 @@ after the built-ins, and the list orders threads inside every project, section,
 machine, and worktree group, nested children included, by rank, then `at`, then
 the saved built-in sort, then id. Unkeyed threads follow keyed ones. Pinned
 keeps its own order, including children nested under pinned threads. While a
-drag, a pointer press in the sidebar, or an inline rename is in progress, the
-list keeps the plugin keys it had when the interaction began and applies newer
-keys when it ends; unkeyed threads and exact key ties still follow the live
-built-in sort, as they do without a plugin sort. It uses the built-in sort
-while the chosen sort is not registered.
+drag, a pointer press or keyboard focus in the sidebar, or an inline rename is
+in progress, the list keeps the plugin keys it had when the interaction began
+and applies newer keys when it ends; unkeyed threads and exact key ties still
+follow the live built-in sort, as they do without a plugin sort. It uses the
+built-in sort while the chosen sort is not registered.
 
 **Audit before stabilizing.**
 
@@ -2338,13 +2338,13 @@ while the chosen sort is not registered.
 3. **Ownership and multiple lists.** Keys are global per plugin, not per list.
    Confirm a replacement thread list or a second window reading the same sorts
    needs no per-list scoping.
-4. **Stability contract.** Holding keys during a drag, pointer press, or rename
-   is the list's choice, not the SDK's, and it holds only the plugin keys: a
-   thread keyed during the hold stays among the unkeyed threads until it ends,
-   and ties still move with the built-in sort. Decide whether lists should hold
-   the whole rendered order instead, whether the host should publish a shared
-   "list is busy" signal so every list holds the same way, and whether a scroll
-   anchor is needed when a live key moves the active row.
+4. **Stability contract.** Holding keys during a drag, pointer press, keyboard
+   focus, or rename is the list's choice, not the SDK's, and it holds only the
+   plugin keys: a thread keyed during the hold stays among the unkeyed threads
+   until it ends, and ties still move with the built-in sort. Decide whether
+   lists should hold the whole rendered order instead, whether the host should
+   publish a shared "list is busy" signal so every list holds the same way, and
+   whether a scroll anchor is needed when a live key moves the active row.
 5. **Pinned children.** Children nested under pinned threads always use the
    default updated-at order, whatever built-in or plugin sort is chosen.
    Decide whether the chosen sort, plugin or built-in, should reach them.

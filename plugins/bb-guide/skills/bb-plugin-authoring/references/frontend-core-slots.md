@@ -243,9 +243,10 @@ target? })`. Inside the fixed-tab component,
   The bundled Thread list saves the choice in its `pluginSort` preference,
   orders each project, section, machine, and worktree group (nested children
   included; Pinned keeps its own order) by rank, then `at`, then its built-in
-  sort, and puts unkeyed threads last. During a drag, a pointer press, or an
-  inline rename it keeps the keys it had and applies newer ones when the
-  interaction ends. Experimental: see `docs/api_to_audit.md`.
+  sort, and puts unkeyed threads last. During a drag, a pointer press or
+  keyboard focus in the sidebar, or an inline rename it keeps the keys it had
+  and applies newer ones when the interaction ends. Experimental: see
+  `docs/api_to_audit.md`.
 - `experimental_sidebarNavigation` → replaces the bounded navigation controls
   above the thread list. Registration:
   `{ id, title, description?, component }`. The component receives the

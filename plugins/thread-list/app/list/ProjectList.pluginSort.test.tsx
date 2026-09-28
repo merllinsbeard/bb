@@ -209,4 +209,21 @@ describe("sorting the thread list by a plugin sort", () => {
       expect(rowOrder()).toEqual(["Card C", "Card D", "Card B", "Card A"]),
     );
   });
+
+  it("holds the order while keyboard focus is in the sidebar", async () => {
+    const { slot } = renderList([statusSort({ thr_a: { rank: 0, at: 0 } })]);
+    await waitFor(() => expect(rowOrder()[0]).toBe("Card A"));
+
+    const field = document.createElement("input");
+    document.querySelector('[data-sidebar="sidebar"]')!.append(field);
+    act(() => field.focus());
+    await slot.behavior.experimental_setSidebarThreadSorts([
+      statusSort({ thr_c: { rank: 0, at: 0 } }),
+    ]);
+    expect(rowOrder()[0]).toBe("Card A");
+
+    act(() => field.blur());
+    await waitFor(() => expect(rowOrder()[0]).toBe("Card C"));
+    field.remove();
+  });
 });

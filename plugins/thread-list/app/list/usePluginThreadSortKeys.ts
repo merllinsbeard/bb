@@ -35,6 +35,35 @@ function useSidebarPointerHeld(enabled: boolean): boolean {
   return enabled && held;
 }
 
+function isInSidebar(target: EventTarget | null): target is Element {
+  return target instanceof Element && target.closest(SIDEBAR_SELECTOR) !== null;
+}
+
+function useSidebarKeyboardFocus(enabled: boolean): boolean {
+  const [held, setHeld] = useState(false);
+  useEffect(() => {
+    if (!enabled) return;
+    const enter = (event: FocusEvent) => {
+      const target = event.target;
+      setHeld(isInSidebar(target) && target.matches(":focus-visible"));
+    };
+    const leave = (event: FocusEvent) => {
+      if (!isInSidebar(event.relatedTarget)) setHeld(false);
+    };
+    const release = () => setHeld(false);
+    document.addEventListener("focusin", enter, true);
+    document.addEventListener("focusout", leave, true);
+    window.addEventListener("blur", release);
+    return () => {
+      document.removeEventListener("focusin", enter, true);
+      document.removeEventListener("focusout", leave, true);
+      window.removeEventListener("blur", release);
+      setHeld(false);
+    };
+  }, [enabled]);
+  return enabled && held;
+}
+
 function useHeldWhile<T>(value: T, frozen: boolean): T {
   const [held, setHeld] = useState(value);
   if (!frozen && held !== value) {
@@ -54,5 +83,9 @@ export function usePluginThreadSortKeys(
       : (sorts.find((sort) => sort.key === selectedKey)?.keys ?? null);
   const dragActive = useAtomValue(sidebarDragActiveAtom);
   const pointerHeld = useSidebarPointerHeld(liveKeys !== null);
-  return useHeldWhile(liveKeys, dragActive || pointerHeld || renameActive);
+  const keyboardFocus = useSidebarKeyboardFocus(liveKeys !== null);
+  return useHeldWhile(
+    liveKeys,
+    dragActive || pointerHeld || keyboardFocus || renameActive,
+  );
 }
