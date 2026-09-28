@@ -28,6 +28,14 @@ export const sortDirectionSchema = z.enum([
 ]);
 export type SortDirection = z.infer<typeof sortDirectionSchema>;
 
+const pluginSortSchema = z
+  .string()
+  .max(STRING_MAX_LENGTH)
+  .regex(/^[a-z0-9][a-z0-9-]*:[A-Za-z0-9_-]+$/, {
+    message: "Expected <pluginId>:<sortId>",
+  })
+  .nullable();
+
 export const environmentGroupingSchema = z.union([
   z.literal("auto"),
   z.boolean(),
@@ -108,6 +116,12 @@ export const preferenceDefinitions = {
     "default",
     "Sort direction; default keeps the field's natural direction.",
     "sidebar.sortDirection",
+  ),
+  pluginSort: definePreference(
+    pluginSortSchema,
+    null,
+    "A plugin's sort mode as <pluginId>:<sortId>, or null for the built-in sort. While that plugin's sort is unavailable the list uses chronologicalSort and sortDirection.",
+    null,
   ),
   sectionOrder: definePreference(
     stringListSchema,

@@ -230,6 +230,22 @@ target? })`. Inside the fixed-tab component,
   `{ openSettings }`. New plugins should use
   `app.experimental_sidebarFooter.register({ kind: "action", ... })` so actions
   and disclosures share one surface.
+- `experimental_sidebarThreadSorts.register` → a sort mode that bb's thread
+  list, or a replacement list, offers under Sort by. Registration:
+  `{ id, title, description? }`. It returns a controller whose
+  `setKeys(keys)` replaces the whole key set: each thread id maps to
+  `{ rank, at }` (rank ascending, then `at` descending) or `null` for no key.
+  Invalid input throws and keeps the previous keys. Keys belong to the
+  plugin's frontend generation, so they vanish when the plugin is disabled,
+  reloaded, or crashes, and a reloaded plugin starts empty; publish from code
+  that runs after setup, such as an app overlay component reading your RPC and
+  realtime data. Lists read sorts with `experimental_useSidebarThreadSorts()`.
+  The bundled Thread list saves the choice in its `pluginSort` preference,
+  orders each project, section, machine, and worktree group (nested children
+  included; Pinned keeps its own order) by rank, then `at`, then its built-in
+  sort, and puts unkeyed threads last. During a drag, a pointer press, or an
+  inline rename it keeps the keys it had and applies newer ones when the
+  interaction ends. Experimental: see `docs/api_to_audit.md`.
 - `experimental_sidebarNavigation` → replaces the bounded navigation controls
   above the thread list. Registration:
   `{ id, title, description?, component }`. The component receives the

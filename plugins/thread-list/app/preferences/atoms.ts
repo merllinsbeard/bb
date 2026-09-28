@@ -34,6 +34,7 @@ export const sidebarChronologicalSortAtom =
   createSyncedPreferenceAtom("chronologicalSort");
 export const sidebarSortDirectionAtom =
   createSyncedPreferenceAtom("sortDirection");
+export const sidebarPluginSortAtom = createSyncedPreferenceAtom("pluginSort");
 export const sidebarCollapsedThreadSectionsAtom = createSyncedPreferenceAtom(
   "collapsedThreadSections",
 );

@@ -31,6 +31,7 @@ import {
   getCollectedSidebarFooterItems,
   type CollectedPluginProviderIconRegistration,
   type CollectedExperimentalSidebarFooterItem,
+  type CollectedExperimentalSidebarThreadSort,
   type CollectedManagedSidebarFooterItem,
   type CollectedSidebarFooterItem,
 } from "@get-bb/plugin-sdk/internal/plugin-app-collector";
@@ -46,6 +47,7 @@ export interface PluginRegistrationSet {
   pendingInteractions?: readonly PluginPendingInteractionRegistration[];
   sidebarFooterActions: readonly PluginSidebarFooterActionRegistration[];
   experimentalSidebarFooterItems?: readonly CollectedExperimentalSidebarFooterItem[];
+  experimentalSidebarThreadSorts?: readonly CollectedExperimentalSidebarThreadSort[];
   experimentalSidebarNavigations?: readonly ExperimentalSidebarNavigationRegistration[];
   experimentalSidebarHeaders?: readonly ExperimentalSidebarHeaderRegistration[];
   threadLists?: readonly PluginThreadListRegistration[];
@@ -87,6 +89,8 @@ export interface PluginPendingInteractionSlot
   extends PluginPendingInteractionRegistration, PluginSlotBase {}
 export type PluginSidebarFooterItemSlot = CollectedSidebarFooterItem &
   PluginSlotBase;
+export type ExperimentalSidebarThreadSortSlot =
+  CollectedExperimentalSidebarThreadSort & PluginSlotBase;
 export interface ExperimentalSidebarNavigationSlot
   extends ExperimentalSidebarNavigationRegistration, PluginSlotBase {}
 export interface ExperimentalSidebarHeaderSlot
@@ -129,6 +133,7 @@ export interface PluginSlotSnapshot {
   composerCustomizations: readonly PluginComposerCustomizationSlot[];
   pendingInteractions: readonly PluginPendingInteractionSlot[];
   sidebarFooterItems: readonly PluginSidebarFooterItemSlot[];
+  experimentalSidebarThreadSorts: readonly ExperimentalSidebarThreadSortSlot[];
   experimentalSidebarNavigations: readonly ExperimentalSidebarNavigationSlot[];
   experimentalSidebarHeaders: readonly ExperimentalSidebarHeaderSlot[];
   threadLists: readonly PluginThreadListSlot[];
@@ -157,6 +162,7 @@ export const EMPTY_PLUGIN_SLOT_SNAPSHOT: PluginSlotSnapshot = {
   composerCustomizations: [],
   pendingInteractions: [],
   sidebarFooterItems: [],
+  experimentalSidebarThreadSorts: [],
   experimentalSidebarNavigations: [],
   experimentalSidebarHeaders: [],
   threadLists: [],
@@ -192,6 +198,7 @@ const SLOT_KINDS: readonly SlotKind[] = [
   "composerCustomizations",
   "pendingInteractions",
   "sidebarFooterItems",
+  "experimentalSidebarThreadSorts",
   "experimentalSidebarNavigations",
   "experimentalSidebarHeaders",
   "threadLists",
@@ -251,6 +258,7 @@ function flattenRegistrations(
     composerCustomizations: stamp(set.composerCustomizations),
     pendingInteractions: stamp(set.pendingInteractions),
     sidebarFooterItems: stamp<CollectedSidebarFooterItem>(sidebarFooterItems),
+    experimentalSidebarThreadSorts: stamp(set.experimentalSidebarThreadSorts),
     experimentalSidebarNavigations: stamp(set.experimentalSidebarNavigations),
     experimentalSidebarHeaders: stamp(set.experimentalSidebarHeaders),
     threadLists: stamp(set.threadLists),

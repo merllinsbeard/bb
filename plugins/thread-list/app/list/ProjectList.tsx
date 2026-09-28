@@ -119,6 +119,8 @@ import {
 import { ReorderableSidebarSectionOrderList } from "./ReorderableSidebarSectionOrderList.js";
 import { useSidebarModeSectionOrder } from "./useSidebarModeSectionOrder.js";
 import { haveSameOrder } from "../model/stored-order.js";
+import { withPluginThreadSortKeys } from "../model/plugin-thread-sort.js";
+import { usePluginThreadSortKeys } from "./usePluginThreadSortKeys.js";
 import {
   useSidebarData,
   useSidebarMachineHosts,
@@ -1572,15 +1574,17 @@ function ProjectListComponent({
   );
   const sortDirection = useAtomValue(sidebarSortDirectionAtom);
   const activeRename = useSidebarRenameState();
-  const sidebarThreadComparator = useMemo<ThreadComparator>(
-    () =>
-      getSidebarThreadComparator(
-        chronologicalSort,
-        sortDirection,
-        activeRename,
-      ),
-    [chronologicalSort, sortDirection, activeRename],
-  );
+  const pluginSortKeys = usePluginThreadSortKeys(activeRename !== null);
+  const sidebarThreadComparator = useMemo<ThreadComparator>(() => {
+    const builtIn = getSidebarThreadComparator(
+      chronologicalSort,
+      sortDirection,
+      activeRename,
+    );
+    return pluginSortKeys === null
+      ? builtIn
+      : withPluginThreadSortKeys(builtIn, pluginSortKeys);
+  }, [chronologicalSort, sortDirection, activeRename, pluginSortKeys]);
   const collapsedThreadIds = useMemo(
     () => new Set(collapsedThreadIdList),
     [collapsedThreadIdList],

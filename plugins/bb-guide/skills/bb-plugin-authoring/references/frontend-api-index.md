@@ -58,6 +58,9 @@ Read the installed SDK declarations for the exact current signatures.
   script set on a thread, or null
 - `useSidebarThreadRowStatuses` — every row status by thread id, for
   collapsed-group rollups
+- `experimental_useSidebarThreadSorts` — every plugin's registered thread
+  sort modes with their current `{ rank, at }` keys, for a list's Sort menu
+  and ordering
 - `useSidebarSplitLayout` — the whole split layout with the thread each pane
   shows, or null when nothing is split
 - `useSidebarThreadShortcut` — the jump shortcut assigned to a row while the
@@ -158,6 +161,12 @@ Read the installed SDK declarations for the exact current signatures.
 - `ExperimentalSidebarFooterItemRegistration`
 - `ExperimentalSidebarFooterDisclosureController`
 - `ExperimentalSidebarFooter`
+- `ExperimentalSidebarThreadSorts`
+- `ExperimentalSidebarThreadSortRegistration`
+- `ExperimentalSidebarThreadSortController`
+- `ExperimentalSidebarThreadSortKey`
+- `ExperimentalSidebarThreadSortKeys`
+- `ExperimentalSidebarThreadSort`
 - `ExperimentalSidebarNavigationRegistration`
 - `ExperimentalSidebarHeaderRegistration`
 - `PluginSidebarThreadIndicator`

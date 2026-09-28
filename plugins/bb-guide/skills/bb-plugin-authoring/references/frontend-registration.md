@@ -428,10 +428,41 @@ Cascading actions route through the host's own flow. Archiving a thread with
 children opens bb's confirmation, which counts them; archiving a thread without
 children takes effect immediately. Deletion opens bb's confirmation.
 
+**Plugin sort modes.** A plugin can offer a sort without replacing the list,
+and a list reads every offered sort:
+
+```tsx
+// In the providing plugin's setup:
+const statusSort = app.experimental_sidebarThreadSorts.register({
+  id: "status",
+  title: "Status",
+  description: "Needs owner first, done last",
+});
+// From code that holds the controller, replace every key at once:
+statusSort.setKeys({
+  thr_a: { rank: 0, at: thread.updatedAt },
+  thr_b: null, // no key: sorts after keyed threads
+});
+
+// In a list:
+const sorts = experimental_useSidebarThreadSorts();
+// [{ key: "thread-card:status", pluginId, id, title, description,
+//    keys: ReadonlyMap<threadId, { rank, at }> }]
+```
+
+Order by rank ascending, then `at` descending, then your own sort; threads
+without a key follow keyed ones. Persist the chosen `key` and fall back to your
+own sort while no registered sort has it: the provider may be disabled,
+reloading, or crashed, and its sorts come back when it loads.
+
 Unit-test a list with `renderSlot(...)` from `@get-bb/plugin-sdk/testing/app`:
 seed rows with the `sidebarThreads` option (plus `sidebarDraftThreadIds`,
-`sidebarRowStatuses`, and `sidebarShortcuts` for the per-row hooks) and assert against
-`inspection.sidebarActionCalls`.
+`sidebarRowStatuses`, and `sidebarShortcuts` for the per-row hooks, and
+`experimental_sidebarThreadSorts` for plugin sorts, replaced later with
+`behavior.experimental_setSidebarThreadSorts`) and assert against
+`inspection.sidebarActionCalls`. A sort provider's `loadPluginApp(...)` result
+lists its sorts in `experimentalSidebarThreadSorts`; each entry's
+`runtime.getSnapshot()` returns the keys it last published.
 
 **Splits.** Rows can drag out to the split area:
 

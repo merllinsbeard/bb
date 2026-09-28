@@ -39,6 +39,7 @@ export const {
   useSidebarThreadDraftIds,
   useSidebarThreadRowStatus,
   useSidebarThreadRowStatuses,
+  experimental_useSidebarThreadSorts,
   useSidebarSplitLayout,
   useSidebarThreadShortcut,
   ThreadTitle,

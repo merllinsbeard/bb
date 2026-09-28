@@ -2301,6 +2301,60 @@ renders in the same footer row.
    disclosure replacement, plugin reload, crash isolation, and removal while
    open across desktop and compact sidebar layouts.
 
+## `app.experimental_sidebarThreadSorts` and `experimental_useSidebarThreadSorts` (`@get-bb/plugin-sdk/app`)
+
+**What it does.** Lets a plugin offer a sort mode for a sidebar thread list
+without replacing the list. `app.experimental_sidebarThreadSorts.register({ id,
+title, description? })` returns a controller whose `setKeys(keys)` replaces the
+plugin's whole key set: each thread id maps to `{ rank, at }` (rank ascending,
+then `at` descending) or `null` for no key. Invalid input throws and keeps the
+previous keys; equal keys notify nobody. A list reads the registered sorts with
+`experimental_useSidebarThreadSorts()`, each keyed `<pluginId>:<id>` and carrying
+its title, description, and current keys. Sorts and keys live on the plugin's
+frontend generation, so they vanish when the plugin is disabled, stopped,
+reloaded, or fails to load, and a reloaded plugin starts with no keys.
+
+The built-in thread-list plugin is the first consumer: its synced `pluginSort`
+preference stores the chosen `<pluginId>:<id>`, the Sort menu lists plugin sorts
+after the built-ins, and the list orders threads inside every project, section,
+machine, and worktree group, nested children included, by rank, then `at`, then
+the saved built-in sort, then id. Unkeyed threads follow keyed ones. Pinned
+keeps its own order, including children nested under pinned threads. While a
+drag, a pointer press in the sidebar, or an inline rename is in progress, the
+list keeps the plugin keys it had when the interaction began and applies newer
+keys when it ends; unkeyed threads and exact key ties still follow the live
+built-in sort, as they do without a plugin sort. It uses the built-in sort
+while the chosen sort is not registered.
+
+**Audit before stabilizing.**
+
+1. **Key shape.** Confirm `{ rank, at }` covers real sort modes (status buckets
+   with recency) or whether plugins need a second tiebreaker, string keys, or a
+   comparator contract. Decide whether `at` should be named for what it is
+   (a timestamp in milliseconds) or stay a generic secondary number.
+2. **Whole-set replacement.** `setKeys` replaces every key at once. Measure
+   large lists and frequent status churn; decide whether an incremental
+   `setKey(threadId, key)` or batched patch is needed.
+3. **Ownership and multiple lists.** Keys are global per plugin, not per list.
+   Confirm a replacement thread list or a second window reading the same sorts
+   needs no per-list scoping.
+4. **Stability contract.** Holding keys during a drag, pointer press, or rename
+   is the list's choice, not the SDK's, and it holds only the plugin keys: a
+   thread keyed during the hold stays among the unkeyed threads until it ends,
+   and ties still move with the built-in sort. Decide whether lists should hold
+   the whole rendered order instead, whether the host should publish a shared
+   "list is busy" signal so every list holds the same way, and whether a scroll
+   anchor is needed when a live key moves the active row.
+5. **Pinned children.** Children nested under pinned threads always use the
+   default updated-at order, whatever built-in or plugin sort is chosen.
+   Decide whether the chosen sort, plugin or built-in, should reach them.
+6. **Preference and fallback.** Confirm lists should keep the saved
+   `<pluginId>:<id>` while the provider is absent and fall back silently, and
+   whether the menu should show an unavailable entry instead.
+7. **Consumers.** Stabilize only after a second plugin (beyond the thread-card
+   status sort) publishes keys, and after a replacement thread list consumes
+   the read hook.
+
 ## `app.slots.experimental_sidebarNavigation` (`@get-bb/plugin-sdk/app`)
 
 **What it does.** Replaces the bounded sidebar navigation controls for New

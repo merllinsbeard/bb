@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { experimental_useSidebarThreadSorts } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
 import {
   DropdownMenuGroup,
@@ -19,6 +20,7 @@ import {
   sidebarOrganizationModeAtom,
   sidebarChronologicalSortAtom,
   sidebarSortDirectionAtom,
+  sidebarPluginSortAtom,
   sidebarGroupThreadsByEnvironmentAtom,
   sidebarEnvironmentGroupingAtom,
   sidebarShowProviderIconsAtom,
@@ -134,14 +136,11 @@ export function SidebarHeaderMenuContents({
 function SidebarViewItems({ page }: { page: SidebarViewPage }) {
   const [lifecycles, setLifecycles] = useAtom(sidebarThreadLifecyclesAtom);
   const [organization, setOrganization] = useAtom(sidebarOrganizationModeAtom);
-  const [sort, setSort] = useAtom(sidebarChronologicalSortAtom);
-  const [savedDirection, setDirection] = useAtom(sidebarSortDirectionAtom);
   const setEnvironmentGrouping = useSetAtom(sidebarEnvironmentGroupingAtom);
   const groupByEnvironment = useAtomValue(sidebarGroupThreadsByEnvironmentAtom);
   const [showProviderIcons, setShowProviderIcons] = useAtom(
     sidebarShowProviderIconsAtom,
   );
-  const selectedSort = sort === "none" ? "updated" : sort;
   if (page === "filter") {
     return (
       <DropdownMenuGroup aria-label="Filter">
@@ -235,10 +234,25 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
       </>
     );
   }
+  return <SidebarSortItems />;
+}
+
+function SidebarSortItems() {
+  const [sort, setSort] = useAtom(sidebarChronologicalSortAtom);
+  const [savedDirection, setDirection] = useAtom(sidebarSortDirectionAtom);
+  const [pluginSortKey, setPluginSortKey] = useAtom(sidebarPluginSortAtom);
+  const pluginSorts = experimental_useSidebarThreadSorts();
+  const activePluginSortKey = pluginSorts.some(
+    (pluginSort) => pluginSort.key === pluginSortKey,
+  )
+    ? pluginSortKey
+    : null;
+  const selectedSort = sort === "none" ? "updated" : sort;
   return (
     <DropdownMenuGroup aria-label="Sort">
       {SIDEBAR_SORT_OPTIONS.map((option) => {
-        const selected = selectedSort === option.sort;
+        const saved = selectedSort === option.sort;
+        const selected = saved && activePluginSortKey === null;
         const direction =
           savedDirection === "default" ? option.direction : savedDirection;
         const nextDirection = selected
@@ -258,6 +272,8 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
             }
             onSelect={(event) => {
               event.preventDefault();
+              setPluginSortKey(null);
+              if (saved && activePluginSortKey !== null) return;
               setSort(option.sort);
               setDirection(nextDirection);
             }}
@@ -275,6 +291,27 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
                   className="size-4"
                 />
               )}
+            </span>
+          </DropdownMenuItem>
+        );
+      })}
+      {pluginSorts.length > 0 && <DropdownMenuSeparator />}
+      {pluginSorts.map((pluginSort) => {
+        const selected = pluginSort.key === activePluginSortKey;
+        return (
+          <DropdownMenuItem
+            key={pluginSort.key}
+            role="menuitemradio"
+            aria-checked={selected}
+            title={pluginSort.description ?? undefined}
+            onSelect={(event) => {
+              event.preventDefault();
+              setPluginSortKey(pluginSort.key);
+            }}
+          >
+            {pluginSort.title}
+            <span className="ml-auto inline-flex size-4 shrink-0 items-center justify-center">
+              {selected && <Icon name="Check" className="size-4" />}
             </span>
           </DropdownMenuItem>
         );

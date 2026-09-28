@@ -54,6 +54,7 @@ import {
   type ExperimentalSidebarNavigationItem,
   type ExperimentalSidebarNavigationSplit,
   type ExperimentalSidebarNavigationState,
+  type ExperimentalSidebarThreadSort,
   type PluginSidebarPullRequest,
   type PluginSidebarThreadActions,
   type PluginBrowserBbSdk,
@@ -103,6 +104,7 @@ import {
   collectPluginAppRegistrations,
   type CollectedPluginProviderIconRegistration,
   type CollectedExperimentalSidebarFooterItem,
+  type CollectedExperimentalSidebarThreadSort,
 } from "../internal/plugin-app-collector.js";
 
 /**
@@ -253,6 +255,7 @@ interface SlotEnv {
   sidebarDraftThreadIds: ReadonlySet<string>;
   sidebarRowStatuses: ReadonlyMap<string, PluginSidebarThreadRowStatus>;
   sidebarShortcuts: ReadonlyMap<string, PluginSidebarThreadShortcut>;
+  sidebarThreadSorts: TestSidebarThreadSortsStore;
   sidebarSplitLayout: PluginSidebarSplitLayout | null;
   sidebarNavigation: ExperimentalSidebarNavigationState;
   sidebarNavigationCalls: SidebarNavigationCall[];
@@ -375,6 +378,12 @@ interface TestRealtimeConnectionStore {
   getSnapshot(): PluginRealtimeConnectionState;
   subscribe(listener: () => void): () => void;
   setState(state: PluginRealtimeConnectionState): void;
+}
+
+interface TestSidebarThreadSortsStore {
+  getSnapshot(): readonly ExperimentalSidebarThreadSort[];
+  subscribe(listener: () => void): () => void;
+  set(sorts: readonly ExperimentalSidebarThreadSort[]): void;
 }
 
 const SlotEnvContext = createContext<SlotEnv | null>(null);
@@ -1070,6 +1079,16 @@ const testPluginSdkApp = {
   > {
     return useSlotEnv("useSidebarThreadRowStatuses").sidebarRowStatuses;
   },
+  experimental_useSidebarThreadSorts(): readonly ExperimentalSidebarThreadSort[] {
+    const store = useSlotEnv(
+      "experimental_useSidebarThreadSorts",
+    ).sidebarThreadSorts;
+    return useSyncExternalStore(
+      store.subscribe,
+      store.getSnapshot,
+      store.getSnapshot,
+    );
+  },
   useSidebarSplitLayout(): PluginSidebarSplitLayout | null {
     return useSlotEnv("useSidebarSplitLayout").sidebarSplitLayout;
   },
@@ -1180,6 +1199,12 @@ export interface CapturedPluginApp {
   pendingInteractions: PluginPendingInteractionRegistration[];
   sidebarFooterActions: PluginSidebarFooterActionRegistration[];
   experimentalSidebarFooterItems: CollectedExperimentalSidebarFooterItem[];
+  /**
+   * Sorts registered with `app.experimental_sidebarThreadSorts.register`.
+   * `runtime.getSnapshot()` returns the keys last published through the
+   * registration's controller.
+   */
+  experimentalSidebarThreadSorts: CollectedExperimentalSidebarThreadSort[];
   experimentalSidebarNavigations: ExperimentalSidebarNavigationRegistration[];
   experimentalSidebarHeaders: ExperimentalSidebarHeaderRegistration[];
   threadLists: PluginThreadListRegistration[];
@@ -1438,6 +1463,12 @@ export interface RenderSlotOptions<
    * null.
    */
   sidebarShortcuts?: Record<string, PluginSidebarThreadShortcut>;
+  /**
+   * Plugin sorts `experimental_useSidebarThreadSorts()` reports. Omitted →
+   * none. Change them while mounted with
+   * `behavior.experimental_setSidebarThreadSorts`.
+   */
+  experimental_sidebarThreadSorts?: readonly ExperimentalSidebarThreadSort[];
   /** The split layout `useSidebarSplitLayout()` reports. Omitted → null. */
   sidebarSplitLayout?: PluginSidebarSplitLayout;
   /**
@@ -1496,6 +1527,13 @@ export interface RenderedSlotBehaviorDrivers {
   setComposerText(text: string): Promise<void>;
   /** Replace the scope snapshots returned by composer hooks, wrapped in act. */
   setComposerScope(scope: PluginComposerScope): Promise<void>;
+  /**
+   * Replace what `experimental_useSidebarThreadSorts()` reports, wrapped in
+   * act, as when a providing plugin publishes keys, loads, or unloads.
+   */
+  experimental_setSidebarThreadSorts(
+    sorts: readonly ExperimentalSidebarThreadSort[],
+  ): Promise<void>;
 }
 
 /** Read-only call/write logs produced while the slot is mounted. */
@@ -1631,6 +1669,20 @@ export function renderSlot<
       if (state === realtimeConnectionState) return;
       realtimeConnectionState = state;
       for (const listener of realtimeConnectionListeners) listener();
+    },
+  };
+  let sidebarThreadSortsSnapshot: readonly ExperimentalSidebarThreadSort[] =
+    options.experimental_sidebarThreadSorts ?? [];
+  const sidebarThreadSortsListeners = new Set<() => void>();
+  const sidebarThreadSorts: TestSidebarThreadSortsStore = {
+    getSnapshot: () => sidebarThreadSortsSnapshot,
+    subscribe(listener) {
+      sidebarThreadSortsListeners.add(listener);
+      return () => sidebarThreadSortsListeners.delete(listener);
+    },
+    set(sorts) {
+      sidebarThreadSortsSnapshot = sorts;
+      for (const listener of sidebarThreadSortsListeners) listener();
     },
   };
 
@@ -2036,6 +2088,7 @@ export function renderSlot<
     sidebarDraftThreadIds,
     sidebarRowStatuses,
     sidebarShortcuts,
+    sidebarThreadSorts,
     sidebarSplitLayout: options.sidebarSplitLayout ?? null,
     sidebarNavigation,
     sidebarNavigationCalls,
@@ -2112,6 +2165,11 @@ export function renderSlot<
       notifyComposerListeners();
     });
   };
+  const setSidebarThreadSorts = async (
+    sorts: readonly ExperimentalSidebarThreadSort[],
+  ): Promise<void> => {
+    await act(async () => sidebarThreadSorts.set(sorts));
+  };
   const unmountSlot = (): void => {
     if (!composerOwnership.active) return;
     result.unmount();
@@ -2126,6 +2184,7 @@ export function renderSlot<
     setRealtimeConnectionState,
     setComposerText,
     setComposerScope,
+    experimental_setSidebarThreadSorts: setSidebarThreadSorts,
     navigateCalls,
     experimental_fixedTabOpenCalls,
     sidebarActionCalls,
@@ -2137,6 +2196,7 @@ export function renderSlot<
       setRealtimeConnectionState,
       setComposerText,
       setComposerScope,
+      experimental_setSidebarThreadSorts: setSidebarThreadSorts,
     },
     inspection: {
       rpcCalls,

@@ -1011,6 +1011,83 @@ export interface ExperimentalSidebarFooter {
 }
 
 // ---------------------------------------------------------------------------
+// Sidebar thread sorts (`app.experimental_sidebarThreadSorts`).
+// ---------------------------------------------------------------------------
+
+/**
+ * A sort mode a plugin offers to sidebar thread lists. bb's list shows
+ * `title` in its Sort menu after the built-in sorts. The plugin supplies only
+ * per-thread keys; the list keeps its own grouping, pins, nesting, and drag
+ * and drop.
+ */
+export interface ExperimentalSidebarThreadSortRegistration {
+  /** Unique within the plugin; letters, digits, `-`, `_`. */
+  id: string;
+  /** Sort menu label, such as "By status". */
+  title: string;
+  /** Longer explanation a list may show with the title. */
+  description?: string;
+}
+
+/** One thread's position under a plugin sort. */
+export interface ExperimentalSidebarThreadSortKey {
+  /** Primary order, ascending: a lower rank lists higher. Finite. */
+  rank: number;
+  /**
+   * Epoch milliseconds of the thread's meaningful activity. Among equal ranks
+   * a later `at` lists higher. Finite.
+   */
+  at: number;
+}
+
+/**
+ * Every key of one sort, by thread id. A thread that is absent or maps to
+ * `null` has no key; lists place unkeyed threads after keyed ones, in their
+ * own order.
+ */
+export type ExperimentalSidebarThreadSortKeys = Readonly<
+  Record<string, ExperimentalSidebarThreadSortKey | null>
+>;
+
+/** Live control over one registered sort's keys. */
+export interface ExperimentalSidebarThreadSortController {
+  /**
+   * Replace every key of this sort in one call; an empty object clears them.
+   * Throws on a blank thread id or a non-finite `rank` or `at` and keeps the
+   * previous keys. Publishing keys equal to the current ones notifies nobody.
+   * Keys belong to this registration: they disappear when the plugin's
+   * frontend unloads, and a reloaded plugin starts with none.
+   */
+  setKeys(keys: ExperimentalSidebarThreadSortKeys): void;
+}
+
+/** Registration surface for sort modes offered to sidebar thread lists. */
+export interface ExperimentalSidebarThreadSorts {
+  register(
+    registration: ExperimentalSidebarThreadSortRegistration,
+  ): ExperimentalSidebarThreadSortController;
+}
+
+/**
+ * A registered sort as a thread list reads it through
+ * `experimental_useSidebarThreadSorts()`.
+ */
+export interface ExperimentalSidebarThreadSort {
+  /**
+   * `<pluginId>:<id>`. Stable across reloads, so a list persists it as the
+   * user's choice and falls back to its own sort while no registered sort
+   * has that key.
+   */
+  key: string;
+  pluginId: string;
+  id: string;
+  title: string;
+  description: string | null;
+  /** Current keys by thread id; a thread without a key is absent. */
+  keys: ReadonlyMap<string, ExperimentalSidebarThreadSortKey>;
+}
+
+// ---------------------------------------------------------------------------
 // Sidebar thread data (the `experimental_useSidebarThreads` contract).
 // ---------------------------------------------------------------------------
 
@@ -2242,6 +2319,12 @@ export interface PluginAppBuilder {
   contentScripts: PluginAppContentScripts;
   /** Experimental managed region for actions and disclosures in the sidebar footer. */
   experimental_sidebarFooter: ExperimentalSidebarFooter;
+  /**
+   * Offer sort modes to sidebar thread lists and publish their per-thread
+   * keys (see {@link ExperimentalSidebarThreadSortRegistration}).
+   * Experimental: see docs/api_to_audit.md.
+   */
+  experimental_sidebarThreadSorts: ExperimentalSidebarThreadSorts;
 }
 
 export type PluginAppSetup = (app: PluginAppBuilder) => void;
@@ -3249,6 +3332,15 @@ export interface PluginSdkApp {
     string,
     PluginSidebarThreadRowStatus
   >;
+  /**
+   * Every sort mode enabled plugins offer to thread lists, with its current
+   * keys (see {@link ExperimentalSidebarThreadSort}), ordered by plugin id
+   * and then registration order. A sort disappears with its plugin's
+   * frontend: disabled, stopped, removed, or failed to load. The array and
+   * each entry keep their identity until a registration or its keys change.
+   * Experimental: see docs/api_to_audit.md.
+   */
+  experimental_useSidebarThreadSorts(): readonly ExperimentalSidebarThreadSort[];
   /**
    * The whole split layout (see {@link PluginSidebarSplitLayout}), or null
    * when nothing is split. One subscription for the whole list.

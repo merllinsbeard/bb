@@ -4,6 +4,8 @@ import { cleanup, fireEvent, render, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type {
+  ExperimentalSidebarThreadSort,
+  ExperimentalSidebarThreadSortController,
   PluginComposerApi,
   PluginComposerScope,
   PluginMessageDirectiveProps,
@@ -37,6 +39,7 @@ const {
   useSdk,
   experimental_useSidebarNavigation,
   experimental_useSidebarNavigationSplit,
+  experimental_useSidebarThreadSorts,
   experimental_SidebarNavigationIcon: SidebarNavigationIcon,
 } = await import("../../app.js");
 
@@ -904,6 +907,95 @@ describe("loadPluginApp", () => {
     await mounted.lifecycle.dispose();
   });
 
+  it("captures sidebar thread sorts and validates their registrations and keys like the host", async () => {
+    let controller: ExperimentalSidebarThreadSortController | undefined;
+    const captured = await loadPluginApp(
+      definePluginApp((app) => {
+        controller = app.experimental_sidebarThreadSorts.register({
+          id: "status",
+          title: "Status",
+          description: "Needs owner first",
+        });
+      }),
+    );
+    const [sort] = captured.experimentalSidebarThreadSorts;
+    expect(sort).toMatchObject({
+      id: "status",
+      title: "Status",
+      description: "Needs owner first",
+    });
+    expect(sort?.runtime.getSnapshot().size).toBe(0);
+
+    const listener = vi.fn();
+    sort?.runtime.subscribe(listener);
+    controller?.setKeys({
+      thr_a: { rank: 1, at: 20 },
+      thr_b: null,
+    });
+    expect([...(sort?.runtime.getSnapshot() ?? [])]).toEqual([
+      ["thr_a", { rank: 1, at: 20 }],
+    ]);
+    expect(listener).toHaveBeenCalledTimes(1);
+    controller?.setKeys({ thr_a: { rank: 1, at: 20 } });
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    const unsafe = controller as unknown as { setKeys(keys: unknown): void };
+    expect(() => unsafe.setKeys([])).toThrow(
+      "experimental_sidebarThreadSorts setKeys: keys must be an object mapping thread ids to { rank, at } or null",
+    );
+    expect(() => unsafe.setKeys({ " ": { rank: 0, at: 0 } })).toThrow(
+      "thread ids must be non-blank strings",
+    );
+    expect(() => unsafe.setKeys({ thr_a: 3 })).toThrow(
+      '"thr_a" must be { rank, at } or null',
+    );
+    expect(() =>
+      unsafe.setKeys({ thr_a: { rank: 0, at: Number.POSITIVE_INFINITY } }),
+    ).toThrow('"thr_a".at must be a finite number');
+    expect(sort?.runtime.getSnapshot().get("thr_a")).toEqual({
+      rank: 1,
+      at: 20,
+    });
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    controller?.setKeys({});
+    expect(sort?.runtime.getSnapshot().size).toBe(0);
+    expect(listener).toHaveBeenCalledTimes(2);
+
+    await expect(
+      loadPluginApp(
+        definePluginApp((app) => {
+          app.experimental_sidebarThreadSorts.register({ id: "s", title: "A" });
+          app.experimental_sidebarThreadSorts.register({ id: "s", title: "B" });
+        }),
+      ),
+    ).rejects.toThrow(
+      'experimental_sidebarThreadSorts.register: duplicate id "s"',
+    );
+    await expect(
+      loadPluginApp(
+        definePluginApp((app) => {
+          app.experimental_sidebarThreadSorts.register({
+            id: "by status",
+            title: "Status",
+          });
+        }),
+      ),
+    ).rejects.toThrow("experimental_sidebarThreadSorts.register");
+    await expect(
+      loadPluginApp(
+        definePluginApp((app) => {
+          app.experimental_sidebarThreadSorts.register({
+            id: "status",
+            title: "   ",
+          });
+        }),
+      ),
+    ).rejects.toThrow(
+      'experimental_sidebarThreadSorts.register: "title" must not be blank',
+    );
+  });
+
   it("rolls back earlier content scripts when a later mount rejects", async () => {
     const events: string[] = [];
     const captured = await loadPluginApp(
@@ -1731,6 +1823,43 @@ describe("renderSlot", () => {
         tabId: "details",
       },
     ]);
+  });
+
+  it("reports sidebar thread sorts from options and the behavior driver", async () => {
+    function SortProbe() {
+      const sorts = experimental_useSidebarThreadSorts();
+      return (
+        <ul>
+          {sorts.map((sort) => (
+            <li key={sort.key}>
+              {sort.title}: {[...sort.keys.keys()].join(",")}
+            </li>
+          ))}
+        </ul>
+      );
+    }
+    const status: ExperimentalSidebarThreadSort = {
+      key: "thread-card:status",
+      pluginId: "thread-card",
+      id: "status",
+      title: "Status",
+      description: null,
+      keys: new Map([["thr_a", { rank: 0, at: 1 }]]),
+    };
+    const slot = renderSlot(
+      { component: SortProbe },
+      {},
+      { experimental_sidebarThreadSorts: [status] },
+    );
+    expect(slot.getByRole("listitem").textContent).toBe("Status: thr_a");
+
+    await slot.behavior.experimental_setSidebarThreadSorts([]);
+    expect(slot.queryByRole("listitem")).toBeNull();
+
+    await slot.experimental_setSidebarThreadSorts([
+      { ...status, keys: new Map([["thr_b", { rank: 0, at: 1 }]]) },
+    ]);
+    expect(slot.getByRole("listitem").textContent).toBe("Status: thr_b");
   });
 
   it("drives the shared realtime connection lifecycle", async () => {

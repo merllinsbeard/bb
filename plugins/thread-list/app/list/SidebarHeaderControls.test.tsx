@@ -8,17 +8,23 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { createStore, Provider } from "jotai";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ExperimentalSidebarThreadSort } from "@get-bb/plugin-sdk/app";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { CompactViewportOverrideProvider } from "@/components/ui/hooks/use-compact-viewport";
-import { installTestPluginRuntime } from "@get-bb/plugin-sdk/testing/app";
+import {
+  installTestPluginRuntime,
+  renderSlot,
+} from "@get-bb/plugin-sdk/testing/app";
 import { SIDEBAR_CONTROL_STATE_CLASS } from "../rows/sidebarRowClasses.js";
 import {
   sidebarThreadLifecyclesAtom,
   sidebarChronologicalSortAtom,
   sidebarOrganizationModeAtom,
   sidebarEnvironmentGroupingAtom,
+  sidebarPluginSortAtom,
   sidebarSortDirectionAtom,
   sidebarShowProviderIconsAtom,
 } from "../preferences/atoms.js";
@@ -35,11 +41,30 @@ afterEach(() => {
   cleanup();
 });
 
+function Harness({
+  children,
+  store,
+  compact,
+}: {
+  children: ReactNode;
+  store: ReturnType<typeof createStore>;
+  compact: boolean;
+}) {
+  return (
+    <Provider store={store}>
+      <CompactViewportOverrideProvider isCompactViewport={compact}>
+        <TooltipProvider>{children}</TooltipProvider>
+      </CompactViewportOverrideProvider>
+    </Provider>
+  );
+}
+
 function setup(
   label = "Pinned",
   section = false,
   organization: OrganizationMode = "project",
   compact = false,
+  pluginSorts: readonly ExperimentalSidebarThreadSort[] = [],
 ) {
   const store = createStore();
   store.set(sidebarThreadLifecyclesAtom, ["active"]);
@@ -50,26 +75,34 @@ function setup(
   store.set(sidebarShowProviderIconsAtom, false);
   const newThread = vi.fn();
   const newSection = vi.fn();
-  render(
-    <Provider store={store}>
-      <CompactViewportOverrideProvider isCompactViewport={compact}>
-        <TooltipProvider>
-          <SidebarHeaderActionsProvider value={{ onNewSection: newSection }}>
-            <SidebarHeaderControls label={label} onNewThread={newThread}>
-              {section && (
-                <SidebarSectionMenuItems
-                  onRename={vi.fn()}
-                  onRemove={vi.fn()}
-                />
-              )}
-            </SidebarHeaderControls>
-          </SidebarHeaderActionsProvider>
-        </TooltipProvider>
-      </CompactViewportOverrideProvider>
-    </Provider>,
+  const slot = renderSlot(
+    { component: Harness },
+    {
+      store,
+      compact,
+      children: (
+        <SidebarHeaderActionsProvider value={{ onNewSection: newSection }}>
+          <SidebarHeaderControls label={label} onNewThread={newThread}>
+            {section && (
+              <SidebarSectionMenuItems onRename={vi.fn()} onRemove={vi.fn()} />
+            )}
+          </SidebarHeaderControls>
+        </SidebarHeaderActionsProvider>
+      ),
+    },
+    { experimental_sidebarThreadSorts: pluginSorts },
   );
-  return { store, newThread, newSection };
+  return { store, newThread, newSection, slot };
 }
+
+const STATUS_SORT: ExperimentalSidebarThreadSort = {
+  key: "thread-card:status",
+  pluginId: "thread-card",
+  id: "status",
+  title: "Status",
+  description: "Needs owner first, done last",
+  keys: new Map(),
+};
 
 async function openMenu(label = "Pinned") {
   fireEvent.keyDown(
@@ -302,6 +335,94 @@ describe("sidebar header controls", () => {
         })
         .getAttribute("aria-checked"),
     ).toBe("true");
+  });
+
+  it("lists plugin sorts after the built-ins and round-trips the choice", async () => {
+    const { store } = setup("Pinned", false, "project", false, [STATUS_SORT]);
+    act(() => store.set(sidebarChronologicalSortAtom, "created"));
+    await openMenu();
+    await openSubmenu("Sort by");
+    const status = await screen.findByRole("menuitemradio", { name: "Status" });
+    const sortGroup = screen.getByRole("group", { name: "Sort" });
+    expect(
+      Array.from(
+        sortGroup.querySelectorAll('[role="menuitemradio"], [role="separator"]'),
+      ).map((element) => element.getAttribute("role")),
+    ).toEqual([
+      "menuitemradio",
+      "menuitemradio",
+      "menuitemradio",
+      "separator",
+      "menuitemradio",
+    ]);
+    expect(
+      Array.from(sortGroup.querySelectorAll('[role="menuitemradio"]')).at(-1),
+    ).toBe(status);
+    expect(status.getAttribute("title")).toBe("Needs owner first, done last");
+    expect(status.getAttribute("aria-checked")).toBe("false");
+
+    fireEvent.click(status);
+    expect(store.get(sidebarPluginSortAtom)).toBe("thread-card:status");
+    expect(store.get(sidebarChronologicalSortAtom)).toBe("created");
+    expect(store.get(sidebarSortDirectionAtom)).toBe("default");
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("menuitemradio", { name: "Status" })
+          .getAttribute("aria-checked"),
+      ).toBe("true"),
+    );
+    expect(
+      screen
+        .getByRole("menuitemradio", { name: "Created at" })
+        .getAttribute("aria-checked"),
+    ).toBe("false");
+
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Created at" }));
+    expect(store.get(sidebarPluginSortAtom)).toBeNull();
+    expect(store.get(sidebarChronologicalSortAtom)).toBe("created");
+    expect(store.get(sidebarSortDirectionAtom)).toBe("default");
+    const created = await screen.findByRole("menuitemradio", {
+      name: "Created at, descending. Sort ascending",
+    });
+    expect(created.getAttribute("aria-checked")).toBe("true");
+
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Status" }));
+    fireEvent.click(
+      await screen.findByRole("menuitemradio", { name: "Alphabetical" }),
+    );
+    expect(store.get(sidebarPluginSortAtom)).toBeNull();
+    expect(store.get(sidebarChronologicalSortAtom)).toBe("alpha");
+    expect(store.get(sidebarSortDirectionAtom)).toBe("ascending");
+  });
+
+  it("keeps a saved plugin sort while its provider is absent and shows the built-in sort", async () => {
+    const { store, slot } = setup("Pinned");
+    act(() => store.set(sidebarPluginSortAtom, "thread-card:status"));
+    await openMenu();
+    await openSubmenu("Sort by");
+    const updated = await screen.findByRole("menuitemradio", {
+      name: "Updated at, descending. Sort ascending",
+    });
+    expect(updated.getAttribute("aria-checked")).toBe("true");
+    expect(screen.queryByRole("menuitemradio", { name: "Status" })).toBeNull();
+    expect(store.get(sidebarPluginSortAtom)).toBe("thread-card:status");
+
+    await slot.behavior.experimental_setSidebarThreadSorts([STATUS_SORT]);
+    expect(
+      screen
+        .getByRole("menuitemradio", { name: "Status" })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(
+      screen
+        .getByRole("menuitemradio", { name: "Updated at" })
+        .getAttribute("aria-checked"),
+    ).toBe("false");
+
+    await slot.behavior.experimental_setSidebarThreadSorts([]);
+    expect(screen.queryByRole("menuitemradio", { name: "Status" })).toBeNull();
+    expect(store.get(sidebarPluginSortAtom)).toBe("thread-card:status");
   });
 
   it("announces compact sort direction and resets the nested page after closing", async () => {

@@ -55,6 +55,7 @@ import {
   useSidebarSplitLayout,
   useSidebarThreadSplit,
 } from "./plugin-sidebar-split";
+import { useSidebarThreadSorts } from "./plugin-sidebar-thread-sorts";
 import {
   useSidebarNavigation,
   useSidebarNavigationSplit,
@@ -103,6 +104,7 @@ export const pluginSdkAppImplementation = installDeprecatedAliases(
     useSidebarThreadDraftIds,
     useSidebarThreadRowStatus,
     useSidebarThreadRowStatuses,
+    experimental_useSidebarThreadSorts: useSidebarThreadSorts,
     useSidebarSplitLayout,
     useSidebarThreadShortcut,
     ThreadTitle: PluginThreadTitle,

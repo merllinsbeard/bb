@@ -1,13 +1,13 @@
 ---
 name: thread-list
-description: "Inspect or change the sidebar thread list's layout preferences: organization mode, sort, section order, hidden groups, collapsed groups, and thread row actions."
+description: "Inspect or change the sidebar thread list's layout preferences: organization mode, sort (including plugin sorts), section order, hidden groups, collapsed groups, and thread row actions."
 ---
 
 # Thread list preferences
 
 The Thread list plugin owns the sidebar's layout state. Read it with
 `bb thread-list prefs list --json`; keys are `showProviderIcons`, `threadLifecycles`, `organizationMode`,
-`environmentGrouping`, `chronologicalSort`, `sortDirection`, `sectionOrder`,
+`environmentGrouping`, `chronologicalSort`, `sortDirection`, `pluginSort`, `sectionOrder`,
 `manualSectionOrder`, `machineSectionOrder`, `hiddenGroups` (including the
 built-in `threads` group), `rowActions`,
 `collapsedSections`, `collapsedProjects`, `collapsedThreads`,
@@ -44,6 +44,19 @@ leaves only the menu. For example,
 `bb thread-list prefs set rowActions '["pin","archive"]'`. In the app, a thread
 row's actions menu has Customize row actions, which previews the row's three
 action slots; each slot picks an action or Hide, and filled slots drag to reorder.
+
+Sort by lists sorts other plugins offer after Updated at, Created at, and
+Alphabetical. Choosing one stores `pluginSort` as `<pluginId>:<sortId>`, for
+example `bb thread-list prefs set pluginSort thread-card:status`; choosing a
+built-in sort or `bb thread-list prefs set pluginSort null` clears it. A plugin
+sort orders threads inside every project, section, machine, and worktree group,
+nested children included, by the plugin's keys, then by the saved
+`chronologicalSort` and `sortDirection`. Pinned keeps its own order, including
+children nested under pinned threads. During a drag, a pointer press in the
+sidebar, or an inline rename the list keeps the keys it had and applies newer
+ones when the interaction ends. While
+the providing plugin is disabled, reloading, or failed, the list uses the
+built-in sort and keeps `pluginSort` for when the plugin returns.
 
 Organize → Rows → Provider icons toggles the icon before each thread title.
 `showProviderIcons` defaults to `false`; use

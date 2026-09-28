@@ -8,6 +8,9 @@ import type {
   ExperimentalSidebarFooterDisclosureController,
   ExperimentalSidebarFooterDisclosureRegistration,
   ExperimentalSidebarFooterItemRegistration,
+  ExperimentalSidebarThreadSortController,
+  ExperimentalSidebarThreadSortKey,
+  ExperimentalSidebarThreadSortRegistration,
   PluginAppDefinition,
   PluginContentScriptRegistration,
   PluginDiffRendererRegistration,
@@ -238,6 +241,107 @@ class SidebarFooterCollector implements ExperimentalSidebarFooter {
   }
 }
 
+export interface ExperimentalSidebarThreadSortRuntime {
+  subscribe(listener: () => void): () => void;
+  getSnapshot(): ReadonlyMap<string, ExperimentalSidebarThreadSortKey>;
+}
+
+export type CollectedExperimentalSidebarThreadSort =
+  ExperimentalSidebarThreadSortRegistration & {
+    runtime: ExperimentalSidebarThreadSortRuntime;
+  };
+
+const EMPTY_SIDEBAR_THREAD_SORT_KEYS: ReadonlyMap<
+  string,
+  ExperimentalSidebarThreadSortKey
+> = new Map();
+
+function requireFiniteSortKeyField(
+  kind: string,
+  threadId: string,
+  field: "rank" | "at",
+  value: unknown,
+): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(
+      `${kind}: ${JSON.stringify(threadId)}.${field} must be a finite number`,
+    );
+  }
+  return value;
+}
+
+function parseSidebarThreadSortKeys(
+  value: unknown,
+): ReadonlyMap<string, ExperimentalSidebarThreadSortKey> {
+  const kind = "experimental_sidebarThreadSorts setKeys";
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(
+      `${kind}: keys must be an object mapping thread ids to { rank, at } or null`,
+    );
+  }
+  const keys = new Map<string, ExperimentalSidebarThreadSortKey>();
+  for (const [threadId, entry] of Object.entries(value)) {
+    if (threadId.trim().length === 0) {
+      throw new Error(`${kind}: thread ids must be non-blank strings`);
+    }
+    if (entry === null || entry === undefined) continue;
+    if (typeof entry !== "object" || Array.isArray(entry)) {
+      throw new Error(
+        `${kind}: ${JSON.stringify(threadId)} must be { rank, at } or null`,
+      );
+    }
+    const fields = entry as Record<string, unknown>;
+    keys.set(
+      threadId,
+      Object.freeze({
+        rank: requireFiniteSortKeyField(kind, threadId, "rank", fields.rank),
+        at: requireFiniteSortKeyField(kind, threadId, "at", fields.at),
+      }),
+    );
+  }
+  return keys.size === 0 ? EMPTY_SIDEBAR_THREAD_SORT_KEYS : keys;
+}
+
+function haveSameSidebarThreadSortKeys(
+  left: ReadonlyMap<string, ExperimentalSidebarThreadSortKey>,
+  right: ReadonlyMap<string, ExperimentalSidebarThreadSortKey>,
+): boolean {
+  if (left.size !== right.size) return false;
+  for (const [threadId, key] of left) {
+    const other = right.get(threadId);
+    if (other === undefined || other.rank !== key.rank || other.at !== key.at) {
+      return false;
+    }
+  }
+  return true;
+}
+
+class SidebarThreadSortRuntime implements ExperimentalSidebarThreadSortRuntime {
+  private readonly listeners = new Set<() => void>();
+  private keys = EMPTY_SIDEBAR_THREAD_SORT_KEYS;
+
+  readonly subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  };
+
+  readonly getSnapshot = (): ReadonlyMap<
+    string,
+    ExperimentalSidebarThreadSortKey
+  > => this.keys;
+
+  createController(): ExperimentalSidebarThreadSortController {
+    return Object.freeze({
+      setKeys: (keys: unknown) => {
+        const next = parseSidebarThreadSortKeys(keys);
+        if (haveSameSidebarThreadSortKeys(this.keys, next)) return;
+        this.keys = next;
+        for (const listener of [...this.listeners]) listener();
+      },
+    });
+  }
+}
+
 type PluginNavPanelFixedTabRegistration = NonNullable<
   PluginNavPanelRegistration["fixedTabs"]
 >[number];
@@ -347,6 +451,7 @@ export interface CollectedPluginAppRegistrations {
   pendingInteractions: PluginPendingInteractionRegistration[];
   sidebarFooterActions: PluginSidebarFooterActionRegistration[];
   experimentalSidebarFooterItems: CollectedExperimentalSidebarFooterItem[];
+  experimentalSidebarThreadSorts: CollectedExperimentalSidebarThreadSort[];
   experimentalSidebarNavigations: ExperimentalSidebarNavigationRegistration[];
   experimentalSidebarHeaders: ExperimentalSidebarHeaderRegistration[];
   threadLists: PluginThreadListRegistration[];
@@ -473,6 +578,7 @@ export function collectPluginAppRegistrations(
     pendingInteractions: [],
     sidebarFooterActions: [],
     experimentalSidebarFooterItems: [],
+    experimentalSidebarThreadSorts: [],
     experimentalSidebarNavigations: [],
     experimentalSidebarHeaders: [],
     threadLists: [],
@@ -502,6 +608,7 @@ export function collectPluginAppRegistrations(
     composerCustomization: new Set<string>(),
     pendingInteraction: new Set<string>(),
     sidebarFooterItem: new Set<string>(),
+    sidebarThreadSort: new Set<string>(),
     sidebarNavigation: new Set<string>(),
     sidebarHeader: new Set<string>(),
     threadList: new Set<string>(),
@@ -927,6 +1034,30 @@ export function collectPluginAppRegistrations(
       sidebarFooterItems,
       seenIds.sidebarFooterItem,
     ),
+    experimental_sidebarThreadSorts: {
+      register(registration) {
+        const kind = "experimental_sidebarThreadSorts.register";
+        const id = requireSlotId(kind, registration?.id);
+        requireUniqueId(kind, seenIds.sidebarThreadSort, id);
+        const title = requireNonEmptyString(kind, "title", registration.title);
+        if (title.trim().length === 0) {
+          throw new Error(`${kind}: "title" must not be blank`);
+        }
+        const description = requireOptionalString(
+          kind,
+          "description",
+          registration.description,
+        );
+        const runtime = new SidebarThreadSortRuntime();
+        collected.experimentalSidebarThreadSorts.push({
+          id,
+          title,
+          ...(description !== undefined ? { description } : {}),
+          runtime,
+        });
+        return runtime.createController();
+      },
+    },
     composer: {
       customize(registration) {
         const customization = collectComposerCustomization(

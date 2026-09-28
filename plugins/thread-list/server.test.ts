@@ -261,3 +261,38 @@ it("validates lifecycle selection through CLI and RPC and broadcasts it", async 
     channel: "preferences", payload: { key: "threadLifecycles", value: ["archived"] },
   });
 });
+
+it("stores a plugin sort as <pluginId>:<sortId> and clears it back to the built-in sort", async () => {
+  const { bb, harness } = setup();
+  await bb.storage.kv.set("preference:pluginSort", 42);
+  await plugin(bb);
+  expect(defaultPreferences().pluginSort).toBeNull();
+  const listed = (await harness.behavior.callRpc("listPreferences", null)) as {
+    preferences: { pluginSort: string | null; chronologicalSort: string };
+  };
+  expect(listed.preferences.pluginSort).toBeNull();
+  expect(listed.preferences.chronologicalSort).toBe("updated");
+
+  const set = await harness.behavior.runCli(["prefs", "set", "pluginSort", "thread-card:status"]);
+  expect(set.exitCode).toBe(0);
+  expect(set.stdout).toBe('pluginSort = "thread-card:status"');
+  await expect(bb.storage.kv.get("preference:pluginSort")).resolves.toBe("thread-card:status");
+  expect(harness.realtimeSignals).toContainEqual({
+    channel: "preferences", payload: { key: "pluginSort", value: "thread-card:status" },
+  });
+
+  for (const value of ["status", "Thread-Card:status", "thread-card:", "thread-card:st atus"]) {
+    const bad = await harness.behavior.runCli(["prefs", "set", "pluginSort", value]);
+    expect(bad.exitCode).not.toBe(0);
+    expect(bad.stderr).toMatch(/Invalid value for pluginSort/);
+  }
+  await expect(bb.storage.kv.get("preference:pluginSort")).resolves.toBe("thread-card:status");
+
+  const cleared = await harness.behavior.runCli(["prefs", "set", "pluginSort", "null"]);
+  expect(cleared.exitCode).toBe(0);
+  expect((await harness.behavior.runCli(["prefs", "get", "pluginSort"])).stdout).toBe("null");
+
+  await harness.behavior.runCli(["prefs", "set", "pluginSort", "thread-card:status"]);
+  const reset = await harness.behavior.runCli(["prefs", "reset", "pluginSort", "--json"]);
+  expect(JSON.parse(reset.stdout)).toEqual({ key: "pluginSort", value: null });
+});

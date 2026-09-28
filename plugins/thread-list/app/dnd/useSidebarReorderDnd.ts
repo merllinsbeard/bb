@@ -1,4 +1,5 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { atom, useSetAtom } from "jotai";
 import {
   TouchSensor,
   type DragEndEvent,
@@ -11,6 +12,8 @@ import {
   type UseReorderDndArgs,
   type UseReorderDndResult,
 } from "../ui/useReorderDnd.js";
+
+export const sidebarDragActiveAtom = atom(false);
 
 function setSidebarDraggingCursor(active: boolean): void {
   if (active) {
@@ -148,30 +151,44 @@ export function useSidebarReorderDnd({
   axis,
   measuring,
 }: UseSidebarReorderDndArgs): UseReorderDndResult {
+  const setSharedDragActive = useSetAtom(sidebarDragActiveAtom);
+  const ownsDragRef = useRef(false);
+  const setDragActive = useCallback(
+    (active: boolean) => {
+      ownsDragRef.current = active;
+      setSharedDragActive(active);
+    },
+    [setSharedDragActive],
+  );
   const handleDragStart = useCallback(
     (event: DragStartEvent) => {
       setSidebarDraggingCursor(true);
+      setDragActive(true);
       onDragStart?.(event);
     },
-    [onDragStart],
+    [onDragStart, setDragActive],
   );
   const handleDragCancel = useCallback(() => {
     setSidebarDraggingCursor(false);
+    setDragActive(false);
     onDragCancel?.();
-  }, [onDragCancel]);
+  }, [onDragCancel, setDragActive]);
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       setSidebarDraggingCursor(false);
+      setDragActive(false);
       onDragEnd(event);
     },
-    [onDragEnd],
+    [onDragEnd, setDragActive],
   );
 
   useEffect(() => {
+    const ownsDrag = ownsDragRef;
     return () => {
       setSidebarDraggingCursor(false);
+      if (ownsDrag.current) setSharedDragActive(false);
     };
-  }, []);
+  }, [setSharedDragActive]);
 
   return useReorderDnd({
     onDragEnd: handleDragEnd,
