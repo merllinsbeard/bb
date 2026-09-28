@@ -2353,7 +2353,7 @@ not registered.
 6. **Preference and fallback.** Confirm lists should keep the saved
    `<pluginId>:<id>` while the provider is absent and fall back silently, and
    whether the menu should show an unavailable entry instead.
-7. **Consumers.** Stabilize only after a second plugin (beyond the thread-card
+7. **Consumers.** Stabilize only after a second plugin (beyond the first
    status sort) publishes keys, and after a replacement thread list consumes
    the read hook.
 

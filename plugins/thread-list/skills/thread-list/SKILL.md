@@ -47,7 +47,7 @@ action slots; each slot picks an action or Hide, and filled slots drag to reorde
 
 Sort by lists sorts other plugins offer after Updated at, Created at, and
 Alphabetical. Choosing one stores `pluginSort` as `<pluginId>:<sortId>`, for
-example `bb thread-list prefs set pluginSort thread-card:status`; choosing a
+example `bb thread-list prefs set pluginSort my-plugin:status`; choosing a
 built-in sort or `bb thread-list prefs set pluginSort null` clears it. A plugin
 sort orders threads inside every project, section, machine, and worktree group,
 nested children included, by the plugin's keys, then by the saved

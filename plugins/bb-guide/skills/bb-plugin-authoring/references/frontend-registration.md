@@ -446,7 +446,7 @@ statusSort.setKeys({
 
 // In a list:
 const sorts = experimental_useSidebarThreadSorts();
-// [{ key: "thread-card:status", pluginId, id, title, description,
+// [{ key: "my-plugin:status", pluginId, id, title, description,
 //    keys: ReadonlyMap<threadId, { rank, at }> }]
 ```
 
