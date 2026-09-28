@@ -2323,8 +2323,10 @@ keeps its own order, including children nested under pinned threads. While a
 drag, a pointer press or keyboard focus in the sidebar, or an inline rename is
 in progress, the list keeps the plugin keys it had when the interaction began
 and applies newer keys when it ends; unkeyed threads and exact key ties still
-follow the live built-in sort, as they do without a plugin sort. It uses the
-built-in sort while the chosen sort is not registered.
+follow the live built-in sort, as they do without a plugin sort. When newer keys
+move rows, the list scrolls by the shift most visible rows share, so what the
+reader sees stays in place. It uses the built-in sort while the chosen sort is
+not registered.
 
 **Audit before stabilizing.**
 
@@ -2344,7 +2346,7 @@ built-in sort while the chosen sort is not registered.
    until it ends, and ties still move with the built-in sort. Decide whether
    lists should hold the whole rendered order instead, whether the host should
    publish a shared "list is busy" signal so every list holds the same way, and
-   whether a scroll anchor is needed when a live key moves the active row.
+   whether keeping visible rows in place should move to the host for every list.
 5. **Pinned children.** Children nested under pinned threads always use the
    default updated-at order, whatever built-in or plugin sort is chosen.
    Decide whether the chosen sort, plugin or built-in, should reach them.

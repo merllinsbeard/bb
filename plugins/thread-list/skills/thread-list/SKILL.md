@@ -54,8 +54,8 @@ nested children included, by the plugin's keys, then by the saved
 `chronologicalSort` and `sortDirection`. Pinned keeps its own order, including
 children nested under pinned threads. During a drag, a pointer press or keyboard
 focus in the sidebar, or an inline rename the list keeps the keys it had and
-applies newer ones when the interaction ends. While
-the providing plugin is disabled, reloading, or failed, the list uses the
+applies newer ones when the interaction ends, keeping the visible rows in place.
+While the providing plugin is disabled, reloading, or failed, the list uses the
 built-in sort and keeps `pluginSort` for when the plugin returns.
 
 Organize → Rows → Provider icons toggles the icon before each thread title.

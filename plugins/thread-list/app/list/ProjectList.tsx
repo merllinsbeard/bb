@@ -121,6 +121,7 @@ import { useSidebarModeSectionOrder } from "./useSidebarModeSectionOrder.js";
 import { haveSameOrder } from "../model/stored-order.js";
 import { withPluginThreadSortKeys } from "../model/plugin-thread-sort.js";
 import { usePluginThreadSortKeys } from "./usePluginThreadSortKeys.js";
+import { PluginSortScrollAnchor } from "./PluginSortScrollAnchor.js";
 import {
   useSidebarData,
   useSidebarMachineHosts,
@@ -1548,7 +1549,8 @@ function ProjectListComponent({
         sectionId={sectionId}
         onNewThread={
           hostId
-            ? () => openRootComposeForProject(personalProjectId, undefined, hostId)
+            ? () =>
+                openRootComposeForProject(personalProjectId, undefined, hostId)
             : handleCreateProjectlessThread
         }
         open={openSidebarMenu === menuId}
@@ -1740,6 +1742,7 @@ function ProjectListComponent({
       }}
     >
       <ProjectListSectionMoveScope sections={sections}>
+        <PluginSortScrollAnchor keys={pluginSortKeys} />
         <ActiveSidebarModeSections
           mode={organizationMode}
           renderMachine={() => (

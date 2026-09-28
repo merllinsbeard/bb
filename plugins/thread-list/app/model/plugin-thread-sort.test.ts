@@ -8,7 +8,10 @@ import {
   type ProjectThreadItem,
   type ThreadComparator,
 } from "./project-thread-groups.js";
-import { withPluginThreadSortKeys } from "./plugin-thread-sort.js";
+import {
+  scrollShiftKeepingRows,
+  withPluginThreadSortKeys,
+} from "./plugin-thread-sort.js";
 import {
   makeSidebarEnvironment,
   makeSidebarThread,
@@ -208,5 +211,38 @@ describe("withPluginThreadSortKeys", () => {
       "thr_loose_y",
       "thr_loose_b",
     ]);
+  });
+});
+
+describe("keeping visible rows in place when plugin keys reorder the list", () => {
+  const tops = (entries: Record<string, number>) =>
+    new Map(Object.entries(entries));
+
+  it("scrolls by the shift of rows pushed down by a thread moving above them", () => {
+    expect(
+      scrollShiftKeepingRows(
+        tops({ thr_a: 10, thr_b: 40, thr_c: 70 }),
+        tops({ thr_moved: 10, thr_a: 40, thr_b: 70, thr_c: 100 }),
+      ),
+    ).toBe(30);
+  });
+
+  it("follows the rows that stayed together, not a visible row that moved away", () => {
+    expect(
+      scrollShiftKeepingRows(
+        tops({ thr_moved: 10, thr_a: 40, thr_b: 70, thr_c: 100 }),
+        tops({ thr_a: 10, thr_b: 40, thr_c: 70, thr_moved: 400 }),
+      ),
+    ).toBe(-30);
+  });
+
+  it("leaves the scroll alone when nothing visible moved or nothing is left to compare", () => {
+    expect(
+      scrollShiftKeepingRows(
+        tops({ thr_a: 10, thr_b: 40 }),
+        tops({ thr_a: 10, thr_b: 40, thr_c: 70 }),
+      ),
+    ).toBe(0);
+    expect(scrollShiftKeepingRows(tops({ thr_a: 10 }), tops({}))).toBe(0);
   });
 });

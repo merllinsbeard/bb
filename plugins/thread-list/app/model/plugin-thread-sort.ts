@@ -64,3 +64,28 @@ export function withPluginThreadSortKeys(
   }
   return comparator;
 }
+
+export function scrollShiftKeepingRows(
+  before: ReadonlyMap<string, number>,
+  after: ReadonlyMap<string, number>,
+): number {
+  const votes = new Map<number, number>();
+  for (const [threadId, top] of before) {
+    const next = after.get(threadId);
+    if (next === undefined) continue;
+    const shift = Math.round(next - top);
+    votes.set(shift, (votes.get(shift) ?? 0) + 1);
+  }
+  let best = 0;
+  let bestVotes = 0;
+  for (const [shift, count] of votes) {
+    if (
+      count > bestVotes ||
+      (count === bestVotes && Math.abs(shift) < Math.abs(best))
+    ) {
+      best = shift;
+      bestVotes = count;
+    }
+  }
+  return best;
+}
